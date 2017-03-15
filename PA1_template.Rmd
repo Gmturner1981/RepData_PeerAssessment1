@@ -1,0 +1,307 @@
+---
+title: 'Reproducible Research: Peer Assessment 1'
+author: "G Turner"
+date: "12/03/2017"
+output: html_document
+---
+
+github repo with RMarkdown source code: https://github.com/mgmarques/RepData_PeerAssessment1
+
+### Document Summary
+
+Presents the results of the Reproducible Research???s Peer Assessment 1 in a report using a single R markdown document that can be processed by knitr and be transformed into an HTML file.
+
+It is important to realise that the data presents t-student distribution (see both histograms), meaning the impact of correcting for NA's with the mean positively effects our predictions and not distort the distribution of the data.
+
+
+### Setting the scene
+
+The code will be visible within my workings to show how the results were achieved: per the work instructionsecho = TRUE is used.
+
+We can set the echo equal to 'TRUE' and results equal to ???hold??? as a global optionfor the remainder of the workings to negate the need to continually call out these rules.
+
+```{r global rule set}
+# Load knitr library
+library(knitr)
+opts_chunk$set(echo = TRUE, results = 'hold')
+# Load data.table, xtable and ggplot2 libraries
+library(data.table)
+library(xtable)
+library(ggplot2) # For plotting figures
+```
+
+### Getting and Cleaning Data
+
+## Load, Review & Prepare the data
+
+The assignment makes use of data from a personal activity monitoring device. This device collects data at 5 minute intervals through out the day.
+
+The data consists of two months of data from an anonymous individual collected during the months of October and November, 2012 and include the number of steps taken in 5 minute intervals each day.
+
+This assignment instructs to show code used for loading and pre-processing.
+
+Initiate with functions definitions and calls libraries
+2.1. Check if the zip source file is present
+2.1.1. uncompress the file
+2.1.2. If not the data file is downloaded and uncompressed
+
+The data is read as a data variable type data frame.
+The interval column is converted to factor type.
+The date column is converted to Date type.
+The data is examined by using summary and str well formatted on this document.
+Function definitions and load libraries code segment
+
+First we define a function to check if the files exists in the path defined by file_path. If don???t exists stops execution of the current expression, and executes an error action
+
+```{r data loading1}
+check_file_exist <- function(file_path) 
+{
+        if (!file.exists(file_path))
+                stop("The ", file_path, " not found!") else TRUE 
+}
+```
+
+Next, we use data set and data_dir to define the file_path, call the check_file_exist function to check, if the file exist send a message to user for waiting the load of file. Finally returned with data set load to data variable.
+
+```{r data loading2}
+load_data <- function(data_dir , fileURL, fileSource) 
+{
+        # Dataset check and load 
+        
+        source_path <- paste(data_dir, "/", fileSource , sep="")
+        txt_file <- paste(data_dir, "/","activity.csv", sep="")
+
+        if (!file.exists(txt_file)) {
+                if (!file.exists(source_path)) {
+                        message(paste("Please Wait! Load", fileURL, "..."));
+                        download.file(fileURL, destfile=source_path);
+                } 
+                else {
+                    message(paste("Please Wait! Unzip", source_path, " file..."));
+                    unzip(source_path, exdir = data_dir);
+                }
+        }
+        message(paste("Please Wait! Load", txt_file, " to dataset..."));
+        data <- read.csv(txt_file,
+                         header=TRUE,  na.strings="NA",
+                         colClasses=c("numeric", "character", "numeric"))
+        data$interval <- factor(data$interval)
+        data$date <- as.Date(data$date, format="%Y-%m-%d")
+        data        
+        
+}
+```
+
+### Assign the directory that all data set was unzip and confirm its exists.
+```{r loading data in}
+data_dir <- "~/Documents/R/activity.csv";
+```
+
+Check if ???activity.csv??? exists.
+```{r loading data in1}
+if (!file.exists(data_dir)){
+        # data_dir <- readline(prompt = "Please, inform your data directory path: ")
+        data_dir <-"~/Documents/R/activity.csv" ## simulate a valid data entry
+        if (!file.exists(data_dir)){
+                stop("You inform a invalid directory path")
+        }
+}
+```
+
+Data load and preparation - call and run to assign the tidy data to a data frame variable named tidy.
+
+Here, we initiate the main variables and run data load and preparation process for the activity data.
+
+```{r download data}
+  download.file('https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip', 
+                'activity.zip', method="curl")
+  unzip('activity.zip')
+  activity <- read.csv("activity.csv", stringsAsFactors=FALSE)
+  activity$date <- as.Date(activity$date, "%Y-%m-%d")  
+```
+Now, we can proceed with the data pre-examination of its str and ???
+
+```{r structure}
+str(activity)
+```
+
+???summary methods.
+```{r summary}
+xt <- xtable(summary(activity))
+print(xt, type = "html")
+```
+
+### Questions from this Peer Assessment:
+
+## What is mean total number of steps taken per day?
+
+For this part of the assignment, we can ignore the missing values in the data set.
+
+We initiate with a pre-calculation of steps aggregation by day:
+
+```{r steps taken}
+steps_taken_per_day <- aggregate(steps ~ date, activity, sum)
+colnames(steps_taken_per_day) <- c("date", "steps")
+```
+
+1. Present a histogram of the total number of steps taken each day - this has been plotted with a bin interval of 1000 steps per Day.
+```{r ggplot}
+ggplot(steps_taken_per_day, aes(x = steps)) + 
+       geom_histogram(fill = "pink", binwidth = 5000) + 
+        labs(title="Hist of steps p/day", 
+             x = "No. steps p/day", y = "Count") + 
+        theme_bw()
+```
+
+2. Finally, we presents the mean and median of total number of steps taken per day:
+```{r mean and median calc}
+mean_steps = round(mean(steps_taken_per_day$steps, na.rm=TRUE), 2)
+median_steps = round(median(steps_taken_per_day$steps, na.rm=TRUE), 2)
+```
+
+The mean is `r mean_steps` the median is `median_steps`.
+
+### What is the average daily activity pattern?
+
+Calculate aggregation of steps by 5 minute intervals, coerce interval in to integer and give names for columns of the result of this step.
+```{r aggregation}
+steps_per_interval <- aggregate(activity$steps, by = list(interval = activity$interval), FUN=mean, na.rm=TRUE)
+    # convert to integers for plotting
+steps_per_interval$interval <- 
+        as.integer(levels(steps_per_interval$interval)[steps_per_interval$interval])
+colnames(steps_per_interval) <- c("interval", "steps")
+```
+
+Present a plot of the time series of average number of steps taken (averaged across all days) vs the 5-minute intervals:
+```{r time series aggregation}
+ggplot(steps_per_interval, aes(x=interval, y=steps)) +   
+        geom_line(color="red", size=1) +  
+        labs(title="Avg Daily Activity Pattern", x="Interval", y="No. steps") +  
+        theme_bw() + theme(legend.position = "right")
+```
+
+Now, we find the 5-minute interval with the containing the maximum number of steps:
+```{r max steps location}
+max_step_interval <- steps_per_interval[which.max(  
+        steps_per_interval$steps),]$interval
+```
+
+The `r max_step_interval`th 5-minute interval containing the maximum number of steps.
+
+### Imputing missing values:
+
+## Total number of missing values in the dataset:
+
+We know the total number of NA's from when the summary step was run earlier.  We can can count the number of NA's:
+```{r null check}
+NAsum <- sum(is.na(tidy$steps))
+```
+
+There are `r NAsum` missing values.
+
+### Fill in the missing values and create a new dataset:
+
+Replace missing values with the mean value at the same interval across days. 
+```{r Replace null}
+  fill_na <- function(data, defaults) {
+        na_indices <- which(is.na(data$steps))
+        na_replacements <- unlist(lapply(na_indices, FUN=function(idx){
+                interval = data[idx,]$interval
+                defaults[defaults$interval == interval,]$steps
+        }))
+        fill_steps <- data$steps
+        fill_steps[na_indices] <- na_replacements
+        fill_steps
+}
+
+data_fill <- data.frame(  
+        steps = fill_na(tidy, steps_per_interval),  
+        date = tidy$date,  
+        interval = tidy$interval)
+```
+
+## A histogram of the total number of steps taken each day
+
+Histogram of the daily total number of steps taken after the populate missing values.
+```{r histogram post missing fix}
+full_steps_per_day <- aggregate(steps ~ date, data_fill, sum)
+colnames(full_steps_per_day) <- c("date", "steps")
+    
+ggplot(full_steps_per_day, aes(x=steps)) + 
+        geom_histogram(fill="green", binwidth=5000) + 
+        labs(title="Hist. of full steps taken p/day", 
+             x="No. steps post NA fix", 
+             y="Count") + 
+        theme_bw()     
+```
+
+## Calculate and show the mean and median total number of steps taken per day
+```{r Mean & Median Calc}
+full_mean_steps = round(mean(full_steps_per_day$steps), 2)
+full_median_steps = round(median(full_steps_per_day$steps), 2)
+```
+New Mean is `r full_mean_steps`
+New Median is `r full_median_steps`
+
+Old (pre fix) Mean was `r mean_steps`
+Old (pre fix) Median was `r median_steps`
+
+## What is the impact of imputing missing data on the estimates of the total daily number of steps?
+
+Comparing the old and new calculations, we can see that the mean value remains the same (this was expected due to the way the new mean was derived), with the median value now shifting closer towards the mean - again,  by product of how the median was derived.
+
+As the data has shown a t-student distribution (see the histograms),  the impact of imputing NA's has increased the max point, but not negatively impacted the  predictions.
+
+
+### Are there differences in activity patterns between weekdays and weekends?
+
+Comparison made using the fixed data table:
+1. Amend the table with a column indicating day of the week
+2. Subset into two parts - weekends and weekdays
+3. Tabulate the average steps per interval.
+4. Plot the two data sets side by side.
+
+```{r Finalise workings}
+weekdays_steps <- function(data) {
+    weekdays_steps <- aggregate(data$steps, by=list(interval = data$interval),
+                          FUN=mean, na.rm=T)
+    # convert to integers for plotting
+    weekdays_steps$interval <- 
+            as.integer(levels(weekdays_steps$interval)[weekdays_steps$interval])
+    colnames(weekdays_steps) <- c("interval", "steps")
+    weekdays_steps
+}
+
+data_by_weekdays <- function(data) {
+    data$weekday <- 
+            as.factor(weekdays(data$date)) # weekdays in portuguese
+    weekend_data <- subset(data, weekday %in% c("s??bado","domingo"))
+    weekday_data <- subset(data, !weekday %in% c("s??bado","domingo"))
+    
+    weekend_steps <- weekdays_steps(weekend_data)
+    weekday_steps <- weekdays_steps(weekday_data)
+    
+    weekend_steps$dayofweek <- rep("weekend", nrow(weekend_steps))
+    weekday_steps$dayofweek <- rep("weekday", nrow(weekday_steps))
+    
+    data_by_weekdays <- rbind(weekend_steps, weekday_steps)
+    data_by_weekdays$dayofweek <- as.factor(data_by_weekdays$dayofweek)
+    data_by_weekdays
+}
+
+data_weekdays <- data_by_weekdays(data_fill)
+```
+
+Panel plot comparing the average number of steps taken per 5-minute interval across weekdays and weekends:
+```{r Panel Plot}
+ggplot(data_weekdays, aes(x=interval, y=steps)) + 
+        geom_line(color="orange", size=1) + 
+        facet_wrap(~ dayofweek, nrow=2, ncol=1) +
+        labs(x="Interval", y="No. steps") +
+        theme_bw()
+```
+
+### Conclusion:
+===============
+
+We can see at the graph above that activity on the weekday has the greatest peak from all steps intervals. But, we can see too that weekends activities has more peaks over a hundred than weekday. This could be due to the fact that activities on weekdays mostly follow a work related routine, where we find some more intensity activity in little a free time that the employ can made some sport. In the other hand, at weekend we can see better distribution of effort along the time.
